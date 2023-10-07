@@ -33,6 +33,12 @@ class Message(VersionedMixin, models.Model):
     def log(self, content):
         return MessageLog.objects.create(content=content, message=self)
 
+
+    def begin_processing(self):
+        self.status = Message.STATUS_PROCESSING
+        self.save()
+
+
     def sent(self):
         self.status = self.STATUS_SENT
         self.save()

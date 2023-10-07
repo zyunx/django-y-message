@@ -1,13 +1,13 @@
 import traceback
-
+import ool
 
 all_handlers = {}
 
+types_for_all_handlers = []
 
 def add_handler(type, handler):
-    handles_of_type = all_handlers.get(type, [])
-    handles_of_type.append(handler)
-    all_handlers[type] = handles_of_type
+    all_handlers[type] = handler
+    types_for_all_handlers.append(type)
 
 
 def message_handler(type):
@@ -30,7 +30,6 @@ class NoMoreMessages(Exception):
 
 
 def get_next_message_for_processing(types):
-    import ool
     from .models import Message
 
     message = None
@@ -38,8 +37,7 @@ def get_next_message_for_processing(types):
         message = Message.objects.filter(status=Message.STATUS_QUEUING, type__in=types).order_by('create_at').first()
         if message is not None:
             try:
-                message.status = Message.STATUS_PROCESSING
-                message.save()
+                message.begin_processing()
             except ool.ConcurrentUpdate:
                 message = None
         else:
@@ -48,20 +46,16 @@ def get_next_message_for_processing(types):
 
 
 def handle_message():
-    
-    message = get_next_message_for_processing(all_handlers.keys())
-
+    message = get_next_message_for_processing(types_for_all_handlers)
     try:
-        handlers_for_type = all_handlers.get(message.type, [])
-        for handler in handlers_for_type:
-            handler(message)
-            if not message.is_processing():
-                break
-        
-        if message.is_processing():
+        handler = all_handlers.get(message.type, None)
+        if handler == None:
             message.no_handler()
-    except Exception as e:
+        else:
+            handler(message)
+    except:
         message.catch_exception({
             'trace': traceback.format_exc()
         })
+
         
